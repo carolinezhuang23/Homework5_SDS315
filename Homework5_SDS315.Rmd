@@ -1,0 +1,106 @@
+---
+title: "Homework4_SDS315"
+author: "Caroline Zhuang"
+output:
+  html_document:
+    toc: yes
+    toc_float: yes
+  pdf_document:
+    toc: yes
+---
+
+```{r global_options, echo=FALSE}
+knitr::opts_chunk$set(fig.height=3, fig.width=4, warning = FALSE)
+library(tidyverse)
+library(ggplot2)
+library(mosaic)
+
+letter_frequencies <- read.csv('letter_frequencies.csv')
+
+```
+
+# **Problem 1**
+```{r, echo = FALSE}
+sim_SEC = do(100000) * nflip(n = 2021, prob = 0.024)
+ggplot(sim_SEC) +
+  geom_histogram(aes(x = nflip), binwidth=1, fill = "hotpink")
+p_SEC = sum(sim_SEC >= 70)/100000
+p_SEC
+```
+In this problem, the null hypothesis that we are testing is if security trades at Iron Bank are flagged at the same 2.4% baseline rate as others. In this scenario, the test statistic is the 70 flagged out of the last 2021 trades at Iron Bank. Since the p-value, `r p_SEC`, is rather small, I think the null hypothesis may not be completely plausible. This might mean that the baseline rate at Iron Bank is higher than others. 
+
+# **Problem 2** 
+```{r, echo = FALSE}
+sim_bites = do(100000) * nflip(n = 50, prob = 0.03)
+ggplot(sim_bites) + 
+  geom_histogram(aes(x = nflip), binwidth = 1, fill = "hotpink")
+p_bites = sum(sim_bites >= 8) / 100000
+p_bites
+```
+The null hypothesis that we are testing in this scenario is the Health Department's claim that on average, 3% of restaurant inspections will result in health code violations. The test statistic is Gourmet Bites getting 8 health code violations out of the 50 inspections the branches had. The p-value, `r p_bites`, is very small, meaning the null hypothesis may not be completely plausible. However, it could also mean that Gourmet Bites has some serious violations that should not be ignored and the Health Department should take action. 
+
+# **Problem 3** 
+```{r, echo = FALSE}
+brown_sentences <- readLines('brown_sentences.txt')
+brown_sentences = data.frame(values = brown_sentences)
+
+calculate_chi_squared = function(sentence, freq_table){
+  
+  # Ensure letter frequencies are normalized and sum to 1
+  freq_table$Probability = freq_table$Probability / sum(freq_table$Probability)
+  
+  # Remove non-letters and convert to uppercase
+  clean_sentence = gsub("[^A-Za-z]", "", sentence)
+  clean_sentence = toupper(clean_sentence)
+  
+   # Count the occurrences of each letter in the sentence
+  observed_counts = table(factor(strsplit(clean_sentence, "")[[1]], levels = freq_table$Letter))
+  
+  # Calculate expected counts
+  total_letters = sum(observed_counts)
+  expected_counts = total_letters * freq_table$Probability
+  
+  # Chi-squared statistic
+  chi_squared_stat = sum((observed_counts - expected_counts)^2 / expected_counts)
+  
+  return(chi_squared_stat)
+}
+
+result_list <- apply(brown_sentences, 1, function(row)
+calculate_chi_squared(row["values"], letter_frequencies))
+result_df <- tibble(
+  sentence = brown_sentences$values,
+  chi_value = sapply(result_list, max)
+)
+
+ggplot(result_df) +
+  geom_histogram(aes(x = chi_value), fill = "hotpink")
+
+mean(result_df$chi_value)
+```
+
+```{r, echo = FALSE}
+ten_sentences <- c(
+  "She opened the book and started to read the first chapter, eagerly anticipating what might come next.",
+  "Despite the heavy rain, they decided to go for a long walk in the park, crossing the main avenue by the fountain in the center.",
+  "The museum’s new exhibit features ancient artifacts from various civilizations around the world.",
+  "He carefully examined the document, looking for any clues that might help solve the mystery.",
+  "The students gathered in the auditorium to listen to the guest speaker’s inspiring lecture.",
+  "Feeling vexed after an arduous and zany day at work, she hoped for a peaceful and quiet evening at home, cozying up after a quick dinner with some TV, or maybe a book on her upcoming visit to Auckland.",
+  "The chef demonstrated how to prepare a delicious meal using only locally sourced ingredients, focusing mainly on some excellent dinner recipes from Spain.",
+  "They watched the sunset from the hilltop, marveling at the beautiful array of colors in the sky.",
+  "The committee reviewed the proposal and provided many points of useful feedback to improve the project’s effectiveness.",
+  "Despite the challenges faced during the project, the team worked tirelessly to ensure its successful completion, resulting in a product that exceeded everyone’s expectations."
+)
+p_values <- data.frame(sentence = ten_sentences)
+p_values$p_value <- NA
+
+for (i in 1:nrow(p_values)){
+  chi_val = calculate_chi_squared(ten_sentences[i], letter_frequencies)
+  p_values$p_value[i] = round(sum(result_df$chi_value >= chi_val) / 56745 , 3)
+}
+p_values <- as.tibble(p_values)
+p_values
+```
+
+The sentence that is produced by LLM is sentence #6. This is because the p-value for sentence 6 is very low compared to the other sentences, meaning the probability that the null-hypothesis (in this case, chi-squared values for letter frequencies) is probably false, which means the distribution of letters is different than what is usually seen. 
